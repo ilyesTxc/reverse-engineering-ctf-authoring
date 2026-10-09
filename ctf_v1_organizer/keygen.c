@@ -91,6 +91,7 @@ __attribute__((noinline)) uint64_t dungeon5(void)
 int main(void)
 {
     static const int order[5] = KEY_ORDER;
+    static const int flip[5] = KEY_FLIP;
     uint64_t piece[5];
     volatile uint64_t key[5];
     int i;
@@ -102,7 +103,7 @@ int main(void)
     piece[4] = dungeon5();
 
     for (i = 0; i < 5; i++)
-        key[i] = piece[order[i]];
+        key[i] = flip[i] ? __builtin_bswap64(piece[order[i]]) : piece[order[i]];
     (void)key;
 
     puts("The Mad Smith hammered five pieces of the key, then hurled them into the chaos. Seek them out!");

@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
-# Solver: recompute the five pieces (rax of dungeon1..dungeon5 in keygen), then try
-# all 5! = 120 orders against ./task. The gatekeeper is skipped with gdb.
+# Solver (organizer only).
+#  1. recompute the five pieces (rax of dungeon1..dungeon5 in keygen)
+#  2. try every arrangement: 5! orders x 2^5 byte-reversals = 3840 candidate keys
+#  3. each candidate is tried against ./task (the gatekeeper is skipped with gdb);
+#     task is slow on purpose (about 1.3 s per guess), so we run many in parallel
+# Needs addresses.json (written by build.py), because the shipped task is stripped.
 # Usage: python3 solve.py [path/to/task]
 import itertools
+import json
+import os
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
-task = sys.argv[1] if len(sys.argv) > 1 else "./task"
+here = os.path.dirname(os.path.abspath(__file__))
+task = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "task")
+gate = json.load(open(os.path.join(here, "addresses.json")))["task"]["gatekeeper"]
 
 t = [
     [0x4B, 0x3C, 0x2D, 0x1E, 0x0F, 0xF0, 0xE1, 0xD2],
@@ -26,25 +34,34 @@ p = [
     [((t[4][i] + K3) & 0xFF) ^ (t[4][i - 1] if i else 0) for i in range(8)],   # dungeon5
 ]
 pieces = ["%016x" % int.from_bytes(bytes(x), "little") for x in p]             # as shown in rax
+rev = ["%016x" % int.from_bytes(bytes(x), "big") for x in p]                   # byte-reversed
 for n, s in enumerate(pieces, 1):
     print("dungeon%d -> %s" % (n, s))
 
 
-def attempt(order):
-    key = "".join(pieces[n] for n in order)
+def candidates():
+    for order in itertools.permutations(range(5)):
+        for flips in itertools.product((0, 1), repeat=5):
+            yield order, flips, "".join((rev if f else pieces)[n] for n, f in zip(order, flips))
+
+
+def attempt(c):
+    order, flips, key = c
     r = subprocess.run(
-        ["gdb", "-q", "-batch", "-ex", "break gatekeeper", "-ex", "run", "-ex", "return",
+        ["gdb", "-q", "-batch", "-ex", "break *%s" % gate, "-ex", "run", "-ex", "return",
          "-ex", "continue", task],
         input=key + "\n", capture_output=True, text=True)
-    return order, key, r.stdout
+    return order, flips, key, r.stdout
 
 
-with ThreadPoolExecutor(max_workers=8) as ex:
-    for order, key, out in ex.map(attempt, itertools.permutations(range(5))):
-        if "Gate groans open" in out:
-            print("order =", [n + 1 for n in order])
+workers = os.cpu_count() or 4
+print("trying 3840 candidates with %d workers ..." % workers)
+with ThreadPoolExecutor(max_workers=workers) as ex:
+    for order, flips, key, out in ex.map(attempt, candidates()):
+        if "groans open" in out:
+            print("order =", [n + 1 for n in order], " flipped slots =", flips)
             print("key   =", key)
             print("blob  =", out.split("groans open")[1].splitlines()[1].strip())
-            break
-    else:
-        print("no order worked")
+            sys.stdout.flush()
+            os._exit(0)
+    print("no arrangement worked")

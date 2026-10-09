@@ -6,7 +6,7 @@
  *    (five 16-digit pieces joined in the right order).
  * 3. A correct key unmasks and prints an encoded blob (3 levels).
  *
- * Only a hash of the key is stored, so the key cannot be read out of this
+ * Only a slow, stretched hash of the key is stored, so the key cannot be read out of this
  * program. The blob is stored XOR-masked with the key, so patching out the
  * key check does not help: a wrong key would only print garbage.
  */
@@ -35,6 +35,19 @@ static uint64_t fnv1a(const unsigned char *p, size_t n)
     while (n--) {
         h ^= *p++;
         h *= 0x100000001B3ULL;
+    }
+    return h;
+}
+
+/* slow on purpose: every wrong guess costs about a second */
+static uint64_t stretch(uint64_t h)
+{
+    uint64_t r;
+
+    for (r = 0; r < STRETCH_ROUNDS; r++) {
+        h ^= h >> 29;
+        h *= 0xBF58476D1CE4E5B9ULL;
+        h ^= h >> 32;
     }
     return h;
 }
@@ -79,7 +92,7 @@ int main(void)
         memcpy(kb + 8 * i, &piece, 8);
     }
 
-    if (fnv1a(kb, KEY_BYTES) != KEY_HASH) {
+    if (stretch(fnv1a(kb, KEY_BYTES)) != KEY_HASH) {
         puts("The Mad Smith cackles: the anvil rings false. Wrong key.");
         return 1;
     }

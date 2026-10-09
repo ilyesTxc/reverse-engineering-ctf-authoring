@@ -1,0 +1,23 @@
+{
+  "keygen": {
+    "blob_data": "0x4011a0",
+    "dungeon1": "0x400466",
+    "dungeon2": "0x4004a8",
+    "dungeon3": "0x4004e5",
+    "dungeon4": "0x400537",
+    "dungeon5": "0x40057d",
+    "main": "0x4005dc",
+    "table1": "0x401220",
+    "table2": "0x401228",
+    "table3": "0x401230",
+    "table4": "0x401238",
+    "table5": "0x401240"
+  },
+  "task": {
+    "access_granted": "0x40306c",
+    "blob_data": "0x4013a0",
+    "gatekeeper": "0x4004d6",
+    "main": "0x40064b",
+    "print_blob": "0x4005af"
+  }
+}
