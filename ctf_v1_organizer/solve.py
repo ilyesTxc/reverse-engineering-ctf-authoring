@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # Solver (organizer only).
 #  1. recompute the five pieces (rax of dungeon1..dungeon5 in keygen)
-#  2. try every arrangement: 5! orders x 2^5 byte-reversals = 3840 candidate keys
+#  2. work out the five slot masks (main of keygen: smix(seed + i); the seed is in generated.h here), then try
+#     every order: 5! = 120 candidate keys. Without the masks the search is hopeless.
 #  3. each candidate is tried against ./task (the gatekeeper is skipped with gdb);
-#     task is slow on purpose (about 1.3 s per guess), so we run many in parallel
+#     task is slow on purpose (about 1.3 s per guess), so we run them in parallel
 # Needs addresses.json (written by build.py), because the shipped task is stripped.
 # Usage: python3 solve.py [path/to/task]
 import itertools
 import json
 import os
+import re
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -34,32 +36,43 @@ p = [
     [((t[4][i] + K3) & 0xFF) ^ (t[4][i - 1] if i else 0) for i in range(8)],   # dungeon5
 ]
 pieces = ["%016x" % int.from_bytes(bytes(x), "little") for x in p]             # as shown in rax
-rev = ["%016x" % int.from_bytes(bytes(x), "big") for x in p]                   # byte-reversed
+M = (1 << 64) - 1
+
+
+def smix(z):
+    z = (z + 0x9E3779B97F4A7C15) & M
+    z = ((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9) & M
+    z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & M
+    return z ^ (z >> 31)
+
+
+seed = int(re.search(r"KEY_SEED (0x[0-9a-fA-F]+)", open(os.path.join(here, "generated.h")).read()).group(1), 16)
+masks = [smix((seed + i) & M) for i in range(5)]   # what main of keygen computes for each slot
 for n, s in enumerate(pieces, 1):
     print("dungeon%d -> %s" % (n, s))
 
 
 def candidates():
     for order in itertools.permutations(range(5)):
-        for flips in itertools.product((0, 1), repeat=5):
-            yield order, flips, "".join((rev if f else pieces)[n] for n, f in zip(order, flips))
+        key = "".join("%016x" % (int(pieces[n], 16) ^ m) for n, m in zip(order, masks))
+        yield order, key
 
 
 def attempt(c):
-    order, flips, key = c
+    order, key = c
     r = subprocess.run(
         ["gdb", "-q", "-batch", "-ex", "break *%s" % gate, "-ex", "run", "-ex", "return",
          "-ex", "continue", task],
         input=key + "\n", capture_output=True, text=True)
-    return order, flips, key, r.stdout
+    return order, key, r.stdout
 
 
 workers = os.cpu_count() or 4
-print("trying 3840 candidates with %d workers ..." % workers)
+print("trying 120 candidates with %d workers ..." % workers)
 with ThreadPoolExecutor(max_workers=workers) as ex:
-    for order, flips, key, out in ex.map(attempt, candidates()):
+    for order, key, out in ex.map(attempt, candidates()):
         if "groans open" in out:
-            print("order =", [n + 1 for n in order], " flipped slots =", flips)
+            print("order =", [n + 1 for n in order])
             print("key   =", key)
             print("blob  =", out.split("groans open")[1].splitlines()[1].strip())
             sys.stdout.flush()

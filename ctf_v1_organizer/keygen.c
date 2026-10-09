@@ -88,10 +88,24 @@ __attribute__((noinline)) uint64_t dungeon5(void)
     return x;
 }
 
+/* a small 64-bit hash, used to make one mask per key slot */
+__attribute__((noinline)) static uint64_t smix(uint64_t z)
+{
+    z += 0x9E3779B97F4A7C15ULL;
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+    return z ^ (z >> 31);
+}
+
+/* mixes the piece with the mask (a + b - 2*(a & b) is the same as a ^ b) */
+__attribute__((noinline)) static uint64_t seal(uint64_t p, uint64_t m)
+{
+    return p + m - 2 * (p & m);
+}
+
 int main(void)
 {
     static const int order[5] = KEY_ORDER;
-    static const int flip[5] = KEY_FLIP;
     uint64_t piece[5];
     volatile uint64_t key[5];
     int i;
@@ -103,7 +117,7 @@ int main(void)
     piece[4] = dungeon5();
 
     for (i = 0; i < 5; i++)
-        key[i] = flip[i] ? __builtin_bswap64(piece[order[i]]) : piece[order[i]];
+        key[i] = seal(piece[order[i]], smix(KEY_SEED + i));
     (void)key;
 
     puts("The Mad Smith hammered five pieces of the key, then hurled them into the chaos. Seek them out!");

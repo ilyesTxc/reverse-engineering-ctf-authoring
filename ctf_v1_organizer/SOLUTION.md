@@ -9,7 +9,7 @@ Players get `keygen` (the Forge) and `task` (the Great Gate), both stripped, plu
 
 1. `keygen` builds **5 pieces** (one per dungeon) and throws them away. They are never printed.
 2. `task` is blocked by a gatekeeper. It must be skipped in a debugger.
-3. The real key is the 5 pieces **joined in a secret order**, with some pieces **byte-reversed**. That is 120 orders x 32 reversals = **3,840 possible keys**.
+3. The real key is the 5 pieces **joined in a secret order**, and every slot is also **mixed with a secret 64-bit mask**. The masks are not stored anywhere: `main` computes them with a small hash, so without reading `main` there is nothing realistic to brute-force.
 4. A wrong key costs about 1.3 seconds, so guessing blindly is slow.
 5. A right key makes `task` print a blob. Decode it (Base64, Hex, ROT13) to get the flag.
 
@@ -23,7 +23,7 @@ strings keygen task   # only the Mad Smith messages
 ```
 
 ### Step 2 - Get the 5 pieces from keygen
-Open `keygen` in Ghidra. `main` (`FUN_004005dc`) calls five functions, one per dungeon. Each one builds 8 bytes from its own table with a simple transform. The result is the piece.
+Open `keygen` in Ghidra. `main` (`FUN_00400666`) calls five functions, one per dungeon. Each one builds 8 bytes from its own table with a simple transform. The result is the piece.
 
 Read each piece in gdb:
 ```
@@ -46,25 +46,26 @@ continue
 (All math is per byte, mod 256. `solve.py` shows the same thing in Python.)
 
 ### Step 3 - Find the arrangement
-Still in `main` of `keygen`, after the five calls, a loop fills the 5 key slots:
-- slot `i` takes piece number `order[i]` = 3, 5, 1, 4, 2
-- and byte-reverses it when `flip[i]` = 1, 0, 1, 1, 0
+In `main` of `keygen` (`FUN_00400666`), after the five calls, a loop fills the 5 key slots. For slot `i` (0 to 4) it does:
+- takes piece number `order[i]` = 3, 5, 1, 4, 2
+- computes a mask with a hash function: `mask = smix(0x5eed1e55c0deba5e + i)` (a small splitmix-style function: add, multiply, shift)
+- mixes them with `p + m - 2*(p & m)`, which is just `p ^ m` written in a way that does not look like XOR
 
 So the key is, 16 hex digits per slot:
 
-| Slot | Piece | Typed value |
-|---|---|---|
-| 1 | dungeon 3, reversed | `f1a8249d067b53ce` |
-| 2 | dungeon 5 | `ef155433f4b463b9` |
-| 3 | dungeon 1, reversed | `80726456482a1c0e` |
-| 4 | dungeon 4, reversed | `0dfda7db683486ca` |
-| 5 | dungeon 2 | `55c77d02b81e61eb` |
+| Slot | Piece (rax) | Mask | Typed value (piece ^ mask) |
+|---|---|---|---|
+| 1 | dungeon 3 `ce537b069d24a8f1` | `9269e76fd82bfaf9` | `5c3a9c69450f5208` |
+| 2 | dungeon 5 `ef155433f4b463b9` | `9c76f570f089a8c8` | `7363a143043dcb71` |
+| 3 | dungeon 1 `0e1c2a4856647280` | `1e1950edaa6eabc7` | `10057aa5fc0ad947` |
+| 4 | dungeon 4 `ca863468dba7fd0d` | `a724bf1af97be74b` | `6da28b7222dc1a46` |
+| 5 | dungeon 2 `55c77d02b81e61eb` | `8207751a5edbd6fc` | `d7c00818e6c5b717` |
 
 ```
-f1a8249d067b53ceef155433f4b463b980726456482a1c0e0dfda7db683486ca55c77d02b81e61eb
+5c3a9c69450f52087363a143043dcb7110057aa5fc0ad9476da28b7222dc1a46d7c00818e6c5b717
 ```
 
-Players who do not read `main` can brute-force all 3,840 keys instead. `solve.py` does this in parallel (about 3 minutes on 16 cores). Run it with `python3 solve.py`. It needs `addresses.json`, which `build.py` writes.
+A player who works out the mask function still has 5! = 120 orders to try, at about 1.3 seconds each. A player who has not cannot guess five 64-bit masks. `solve.py` rebuilds the masks (it takes the seed from `generated.h`, the organizer's copy) and tries the 120 orders in parallel (a few seconds). Run it with `python3 solve.py`. It needs `addresses.json`, which `build.py` writes.
 
 `task` stores only a slow hash of the key, so the key cannot be read from `task` in Ghidra.
 
@@ -111,7 +112,7 @@ CyberChef recipe: **From Base64 -> From Hex -> ROT13** (the Magic wand finds it 
 6. "Each decoding level gives something. Does it look familiar?"
 7. "Five pieces can be joined in more than one order. Look at what `main` does after the five calls."
 8. "The key has 80 hex digits, 16 per piece."
-9. "A piece does not have to be used the way rax shows it. Look at what `main` does to each piece."
+9. "A piece does not have to be used the way rax shows it. Look at what `main` does to each piece before it is stored."
 10. "A wrong guess costs about a second. Do not guess blindly, read `main`."
 
 ## Building and shipping
@@ -120,7 +121,7 @@ CyberChef recipe: **From Base64 -> From Hex -> ROT13** (the Magic wand finds it 
 python3 build.py
 FLAG='SecurinetsENIT{your_flag}' python3 build.py     # different flag
 ```
-- To change the arrangement, edit `ORDER` and `FLIP` at the top of `build.py`. To change the cost of a wrong guess, edit `STRETCH_ROUNDS`.
+- To change the arrangement, edit `ORDER` and `MASK_SEED` at the top of `build.py`. To change the cost of a wrong guess, edit `STRETCH_ROUNDS`.
 - After any rebuild the addresses in this file change. They are in `addresses.json`, or use `objdump -d -M intel task.unstripped`.
 - `build.py` also writes `keygen.unstripped` and `task.unstripped` (with symbols) for you. Do not give those to players.
 - Give players only `ctf_v1_player/` (`keygen`, `task`, `CHALLENGE.txt`). Keep this file, the `.c` files, `generated.h`, `solve.py`, `addresses.json` and the `*.unstripped` files private.
