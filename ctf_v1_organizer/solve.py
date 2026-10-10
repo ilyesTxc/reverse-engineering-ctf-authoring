@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # Solver (organizer only).
 #  1. recompute the five pieces (rax of dungeon1..dungeon5 in keygen)
-#  2. work out the five slot masks (main of keygen: smix(seed + i); the seed is in generated.h here), then try
-#     every order: 5! = 120 candidate keys. Without the masks the search is hopeless.
+#  2. work out the five slot masks (task: smix(seed + slot), seed from generated.h here),
+#     then try every order of the five pieces, each piece XORed with its slot mask:
+#     5! = 120 candidate keys (the order is nowhere in the programs)
 #  3. each candidate is tried against ./task (the gatekeeper is skipped with gdb);
 #     task is slow on purpose (about 1.3 s per guess), so we run them in parallel
 # Needs addresses.json (written by build.py), because the shipped task is stripped.
@@ -36,6 +37,7 @@ p = [
     [((t[4][i] + K3) & 0xFF) ^ (t[4][i - 1] if i else 0) for i in range(8)],   # dungeon5
 ]
 pieces = ["%016x" % int.from_bytes(bytes(x), "little") for x in p]             # as shown in rax
+
 M = (1 << 64) - 1
 
 
@@ -47,15 +49,12 @@ def smix(z):
 
 
 seed = int(re.search(r"KEY_SEED (0x[0-9a-fA-F]+)", open(os.path.join(here, "generated.h")).read()).group(1), 16)
-masks = [smix((seed + i) & M) for i in range(5)]   # what main of keygen computes for each slot
-for n, s in enumerate(pieces, 1):
-    print("dungeon%d -> %s" % (n, s))
+masks = [smix((seed + i) & M) for i in range(5)]
 
 
 def candidates():
     for order in itertools.permutations(range(5)):
-        key = "".join("%016x" % (int(pieces[n], 16) ^ m) for n, m in zip(order, masks))
-        yield order, key
+        yield order, "".join("%016x" % (int(pieces[n], 16) ^ m) for n, m in zip(order, masks))
 
 
 def attempt(c):

@@ -39,6 +39,21 @@ static uint64_t fnv1a(const unsigned char *p, size_t n)
     return h;
 }
 
+/* a small 64-bit hash, used to make one mask per key slot */
+static uint64_t smix(uint64_t z)
+{
+    z += 0x9E3779B97F4A7C15ULL;
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+    return z ^ (z >> 31);
+}
+
+/* mixes the typed piece with the mask (a + b - 2*(a & b) is the same as a ^ b) */
+static uint64_t seal(uint64_t p, uint64_t m)
+{
+    return p + m - 2 * (p & m);
+}
+
 /* slow on purpose: every wrong guess costs about a second */
 static uint64_t stretch(uint64_t h)
 {
@@ -88,7 +103,7 @@ int main(void)
     for (i = 0; i < KEY_BYTES / 8; i++) {
         memcpy(chunk, line + 16 * i, 16);
         chunk[16] = '\0';
-        piece = strtoull(chunk, NULL, 16);
+        piece = seal(strtoull(chunk, NULL, 16), smix(KEY_SEED + i));
         memcpy(kb + 8 * i, &piece, 8);
     }
 

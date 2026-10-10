@@ -2,15 +2,13 @@
  * keygen.c  -  CTF V1 (beginner reverse engineering)
  *
  * Five independent dungeons each build one 64-bit piece of the key.
- * main() joins the five pieces in a fixed order (KEY_ORDER, from generated.h)
- * to make a 40-byte key. The key and the pieces are NEVER printed.
+ * main() calls the five steps and throws the pieces away. They are NEVER printed.
+ * The real key is the five pieces joined in a secret order, which only task knows.
  * Each dungeon returns its piece in rax.
  */
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-
-#include "generated.h"
 
 static const unsigned char table1[8] = { 0x4B, 0x3C, 0x2D, 0x1E, 0x0F, 0xF0, 0xE1, 0xD2 };
 static const unsigned char table2[8] = { 0x91, 0x07, 0xC4, 0x5E, 0xA8, 0x23, 0x6D, 0xFB };
@@ -88,37 +86,16 @@ __attribute__((noinline)) uint64_t dungeon5(void)
     return x;
 }
 
-/* a small 64-bit hash, used to make one mask per key slot */
-__attribute__((noinline)) static uint64_t smix(uint64_t z)
-{
-    z += 0x9E3779B97F4A7C15ULL;
-    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
-    z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
-    return z ^ (z >> 31);
-}
-
-/* mixes the piece with the mask (a + b - 2*(a & b) is the same as a ^ b) */
-__attribute__((noinline)) static uint64_t seal(uint64_t p, uint64_t m)
-{
-    return p + m - 2 * (p & m);
-}
-
 int main(void)
 {
-    static const int order[5] = KEY_ORDER;
-    uint64_t piece[5];
-    volatile uint64_t key[5];
-    int i;
+    volatile uint64_t piece[5];
 
     piece[0] = dungeon1();
     piece[1] = dungeon2();
     piece[2] = dungeon3();
     piece[3] = dungeon4();
     piece[4] = dungeon5();
-
-    for (i = 0; i < 5; i++)
-        key[i] = seal(piece[order[i]], smix(KEY_SEED + i));
-    (void)key;
+    (void)piece;
 
     puts("The Mad Smith hammered five pieces of the key, then hurled them into the chaos. Seek them out!");
     return 0;
