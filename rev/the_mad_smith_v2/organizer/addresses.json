@@ -1,0 +1,36 @@
+{
+  "keygen": {
+    "decoy_01": "0x400c26",
+    "decoy_02": "0x400476",
+    "decoy_03": "0x4004f0",
+    "decoy_04": "0x400981",
+    "decoy_05": "0x400ca0",
+    "decoy_06": "0x4009ed",
+    "decoy_07": "0x400772",
+    "decoy_08": "0x4007d8",
+    "decoy_09": "0x400852",
+    "decoy_10": "0x400a67",
+    "decoy_11": "0x40055b",
+    "decoy_12": "0x4005c1",
+    "decoy_13": "0x400d1c",
+    "decoy_14": "0x400627",
+    "decoy_15": "0x400ad2",
+    "main": "0x400e65",
+    "piece1": "0x4006a1",
+    "piece2": "0x40070c",
+    "piece3": "0x4008b8",
+    "piece4": "0x400934",
+    "piece5": "0x400b41",
+    "piece6": "0x400bbb",
+    "piece7": "0x400d87",
+    "piece8": "0x400e0a"
+  },
+  "task": {
+    "access_granted": "0x40308c",
+    "blob_data": "0x401480",
+    "gatekeeper": "0x400516",
+    "main": "0x4007b5",
+    "print_blob": "0x40073f",
+    "tracer_check": "0x40053b"
+  }
+}

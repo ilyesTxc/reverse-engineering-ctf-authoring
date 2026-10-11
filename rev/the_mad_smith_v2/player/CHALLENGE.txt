@@ -1,0 +1,13 @@
+The Mad Smith's Forge - The Deeper Trial
+
+Hear ye, brave seeker! Thou hast pried open the Great Gate once,
+and the Mad Smith is not amused. He has dug deeper beneath the ruined keep,
+forged a mightier key in more pieces than any one hand can count,
+and strewn the forge with counterfeits to mock thy craft.
+The Forge and the Great Gate stand once more amid the rubble,
+and both now keep watch upon those who watch them.
+Prove thy worth a second time, claim the deeper treasure,
+and bring back the secret of Chaos.
+
+Flag format: SecurinetsENIT{...}
+Platform: Linux x86-64 (64-bit ELF, glibc 2.34 or newer)
